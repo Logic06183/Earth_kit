@@ -144,7 +144,7 @@ fig.title(f"{MONTH} {latest_year} 2m temperature anomaly rel. to {REFERENCE_PERI
 fig.legend(label="Temperature anomaly (°C)")
 
 # Add a marker for Johannesburg
-fig.point(JOHANNESBURG_LON, JOHANNESBURG_LAT, marker='o', color='black', markersize=8, label='Johannesburg')
+fig.scatter(x=[JOHANNESBURG_LON], y=[JOHANNESBURG_LAT], marker='o', color='black', s=80, label='Johannesburg')
 
 # Show the plot (this would be displayed in Jupyter notebook)
 fig.show()
@@ -165,7 +165,7 @@ fig_sa.title(f"{MONTH} {latest_year} temperature anomaly - South Africa region")
 fig_sa.legend(label="Temperature anomaly (°C)")
 
 # Add a marker for Johannesburg
-fig_sa.point(JOHANNESBURG_LON, JOHANNESBURG_LAT, marker='o', color='black', markersize=8, label='Johannesburg')
+fig_sa.scatter(x=[JOHANNESBURG_LON], y=[JOHANNESBURG_LAT], marker='o', color='black', s=80, label='Johannesburg')
 
 # Extract data for Johannesburg specifically
 def find_nearest_grid_point(data, lat, lon):
