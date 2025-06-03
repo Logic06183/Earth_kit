@@ -58,68 +58,114 @@ print("Dataset coordinates:", list(data_celsius.coords))
 
 # Calculate monthly climatology (mean of each month over reference period)
 month_idx = list(calendar.month_name).index(MONTH)
-ref_data = data_celsius.sel(
-    time=lambda t: (t.dt.year >= REFERENCE_PERIOD[0]) & 
-                  (t.dt.year <= REFERENCE_PERIOD[1]) &
-                  (t.dt.month == month_idx)
-)
-ref_mean = ref_data.mean(dim="time")
+
+# We need to filter dates by the forecast_reference_time dimension
+# First, let's extract the years from forecast_reference_time
+time_values = data_celsius.forecast_reference_time.values
+print("Time values sample:", time_values[0])
+
+# Filter for the reference period and the correct month
+ref_mask = []
+for t in time_values:
+    # Convert to datetime if it's not already
+    if not hasattr(t, 'year'):
+        from datetime import datetime
+        if isinstance(t, (int, float)):
+            # Convert from timestamp if necessary
+            dt = datetime.utcfromtimestamp(t)
+        else:
+            # Otherwise parse as string
+            dt = datetime.fromisoformat(str(t).replace('Z', '+00:00'))
+    else:
+        dt = t
+    
+    # Check if in reference period and correct month
+    if (REFERENCE_PERIOD[0] <= dt.year <= REFERENCE_PERIOD[1]) and dt.month == month_idx:
+        ref_mask.append(True)
+    else:
+        ref_mask.append(False)
+
+# Apply the mask to get reference data
+ref_data = data_celsius.isel(forecast_reference_time=ref_mask).mean(dim="forecast_reference_time")
 
 # Calculate the anomaly for the latest year
 latest_year = DATA_PERIOD[1]
-latest_data = data_celsius.sel(
-    time=lambda t: (t.dt.year == latest_year) & (t.dt.month == month_idx)
+
+# Find the latest data using forecast_reference_time
+latest_mask = []
+for t in time_values:
+    # Convert to datetime if it's not already
+    if not hasattr(t, 'year'):
+        from datetime import datetime
+        if isinstance(t, (int, float)):
+            # Convert from timestamp if necessary
+            dt = datetime.utcfromtimestamp(t)
+        else:
+            # Otherwise parse as string
+            dt = datetime.fromisoformat(str(t).replace('Z', '+00:00'))
+    else:
+        dt = t
+    
+    # Check if latest year and correct month
+    if dt.year == latest_year and dt.month == month_idx:
+        latest_mask.append(True)
+    else:
+        latest_mask.append(False)
+
+# Apply the mask to get latest data
+latest_data = data_celsius.isel(forecast_reference_time=latest_mask)
+
+# Calculate anomaly (latest minus reference)
+anomaly = latest_data - ref_data
+
+# Create a map visualization
+fig = earthkit.plots.Map()
+
+# Add coastlines and gridlines
+fig.coastlines()
+fig.gridlines()
+
+# Create a style for temperature anomaly
+temp_style = earthkit.plots.styles.Style(
+    colors="RdBu_r",  # Red-Blue colormap, reversed
+    levels=range(-5, 6, 1),  # Levels from -5 to 5 in steps of 1
+    units="celsius",  # Temperature in Celsius
+    extend="both"  # Extend colorbar in both directions
 )
-anomaly = latest_data - ref_mean
-
-# Create a figure with a map projection
-fig = earthkit.plots.geomap(projection="PlateCarree")
-
-# Add coastlines to the map
-fig.add_coastlines()
-
-# Add gridlines to the map
-fig.add_gridlines()
 
 # Plot the temperature anomaly
-fig.add_data(
+fig.quickplot(
     anomaly.squeeze(),
-    colorbar_label=f"Temperature anomaly (°C)",
-    title=f"{MONTH} {latest_year} 2m temperature anomaly rel. to {REFERENCE_PERIOD}",
-    style={
-        "contour": False,
-        "colors": "RdBu_r",
-        "vmin": -5,
-        "vmax": 5,
-    }
+    style=temp_style
 )
 
+# Add title and colorbar
+fig.title(f"{MONTH} {latest_year} 2m temperature anomaly rel. to {REFERENCE_PERIOD}")
+fig.legend(label="Temperature anomaly (°C)")
+
 # Add a marker for Johannesburg
-fig.add_marker(lon=JOHANNESBURG_LON, lat=JOHANNESBURG_LAT, marker='o', color='black', markersize=8, label='Johannesburg')
+fig.point(JOHANNESBURG_LON, JOHANNESBURG_LAT, marker='o', color='black', markersize=8, label='Johannesburg')
 
 # Show the plot (this would be displayed in Jupyter notebook)
 fig.show()
 
 # Create a second figure focusing on South Africa region
-fig_sa = earthkit.plots.geomap(projection="PlateCarree", extent=[16, 33, -35, -22])
-fig_sa.add_coastlines()
-fig_sa.add_gridlines()
+fig_sa = earthkit.plots.Map(domain=[16, 33, -35, -22])
+fig_sa.coastlines()
+fig_sa.gridlines()
 
 # Plot the temperature anomaly for South Africa region
-fig_sa.add_data(
+fig_sa.quickplot(
     anomaly.squeeze(),
-    colorbar_label=f"Temperature anomaly (°C)",
-    title=f"{MONTH} {latest_year} temperature anomaly - South Africa region",
-    style={
-        "contour": False,
-        "colors": "RdBu_r",
-        "vmin": -5,
-        "vmax": 5,
-    }
+    style=temp_style  # Reuse the same style object
 )
 
+# Add title and colorbar
+fig_sa.title(f"{MONTH} {latest_year} temperature anomaly - South Africa region")
+fig_sa.legend(label="Temperature anomaly (°C)")
+
 # Add a marker for Johannesburg
-fig_sa.add_marker(lon=JOHANNESBURG_LON, lat=JOHANNESBURG_LAT, marker='o', color='black', markersize=8, label='Johannesburg')
+fig_sa.point(JOHANNESBURG_LON, JOHANNESBURG_LAT, marker='o', color='black', markersize=8, label='Johannesburg')
 
 # Extract data for Johannesburg specifically
 def find_nearest_grid_point(data, lat, lon):
@@ -136,7 +182,7 @@ jburg_anomaly = anomaly.isel(latitude=lat_idx, longitude=lon_idx).values.item()
 jburg_latest_temp = latest_data.isel(latitude=lat_idx, longitude=lon_idx).values.item()
 
 # Get the reference period average for Johannesburg
-jburg_ref_temp = ref_mean.isel(latitude=lat_idx, longitude=lon_idx).values.item()
+jburg_ref_temp = ref_data.isel(latitude=lat_idx, longitude=lon_idx).values.item()
 
 print(f"\nJohannesburg, South Africa - {MONTH} {latest_year}:")
 print(f"  Temperature: {jburg_latest_temp:.2f}°C")
