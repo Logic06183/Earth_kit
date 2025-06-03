@@ -150,7 +150,7 @@ fig.scatter(x=[JOHANNESBURG_LON], y=[JOHANNESBURG_LAT], marker='o', color='black
 fig.show()
 
 # Create a second figure focusing on South Africa region
-fig_sa = earthkit.plots.Map(domain=[16, 33, -35, -22])
+fig_sa = earthkit.plots.Map(domain="South Africa")
 fig_sa.coastlines()
 fig_sa.gridlines()
 
