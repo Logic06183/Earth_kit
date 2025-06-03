@@ -1,0 +1,8 @@
+earthkit-data
+earthkit-climate==0.1.1
+earthkit-plots
+earthkit-maps
+numpy
+xarray
+matplotlib
+cdsapi
